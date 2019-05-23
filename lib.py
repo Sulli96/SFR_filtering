@@ -11,6 +11,7 @@ from scipy import special, interpolate, integrate, misc, stats
 from threading import Thread
 import multiprocessing as mp
 
+Nlim = -4. # log_lambda minimum for computing the histogram (if too small, computations can fail)
 
 special.seterr(all="ignore")
 def TestPDF(total, precision):
@@ -236,7 +237,7 @@ def random_from_distrib_process(q, log_lambda, dlog_lambda, precision, N_points=
     '''Return N_points random values from a Custom_pdf of Log_parameters
     log_lambda, dlog_lambda for multiprocessing'''
 
-    if(log_lambda) > -4:
+    if(log_lambda) > Nlim:
         mu, sigma = log_to_ln(log_lambda, dlog_lambda)
         lambda_min, lambda_max = boundaries_log(precision, mu, sigma)
 

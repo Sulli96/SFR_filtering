@@ -16,7 +16,7 @@ import pandas
 
 
 ### Utilities #####################################################
-#global variable to avoid recomputing ln(10) each time 
+#global variable to avoid recomputing ln(10) each time
 ln10 = np.log(10)
 
 def is_number(s):
@@ -219,8 +219,8 @@ class TableGalaxies:
         if self.estimator_method == "median":
             for i in tqdm(range(len(self.log_lambda))):
 
-                # If log_lambda < -5, take 0 as the median
-                if self.log_lambda[i] < -4.5:
+                # If log_lambda < Nlim, take 0 as the median
+                if self.log_lambda[i] < lib.Nlim:
                     self.estimator[i] = 0
 
                 else:
@@ -416,7 +416,7 @@ class TableGalaxies:
                 estimator = lib.GetMedian_1D(x_bins, cdf)
 
                 # Store median & variance
-                sfr_dividedByV[i] = estimator / self.eta / delta_tau / V
+                sfr_DividedByV[i] = estimator / self.eta / delta_tau / V
                 variance_tot_DividedByVSquared[i] =  variance / (V**2)
 
             elif self.estimator_method =="mean":
@@ -991,8 +991,8 @@ if __name__ == "__main__":
     #table_LocalVolume.mapSFR(dmin, dmax, noDisplay=args.noDisplay)
 
     #Plot the flux vs distance & map the flux
-    table_LocalVolume.plotFlux(dmin, dmax, step=step_density, filename_pic=filename_graph, filename_sfr=filename_sfr, noDisplay=args.noDisplay)
-    #table_LocalVolume.mapFlux(dmin, dmax, filename=filename_map, noDisplay=args.noDisplay)
+    table_LocalVolume.plotFilteredSFR(dmin, dmax, step=step_density, filename_pic=filename_graph, filename_sfr=filename_sfr, noDisplay=args.noDisplay)
+    #table_LocalVolume.mapFilteredSFR(dmin, dmax, filename=filename_map, noDisplay=args.noDisplay)
 
     #table_LocalVolume.WriteSimple()
 
