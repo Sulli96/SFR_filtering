@@ -16,7 +16,7 @@ import pandas
 
 
 ### Utilities #####################################################
-#global variable to avoid recomputing ln(10) each time
+#global variable to avoid recomputing ln(10) each time 
 ln10 = np.log(10)
 
 def is_number(s):
