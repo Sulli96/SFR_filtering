@@ -56,8 +56,10 @@ def variance_cpd(mu, sigma):
     return (np.exp(sigma*sigma)-1)  *np.exp(2*mu+sigma*sigma) + np.exp(mu+sigma*sigma/2)
 
 def Compute_median_multi_process(q, log_lambdaV, dlog_lambdaV, precision):
+    '''Compute the CPD for on log_lambda & one dlog_lambda with a precision=precision
+    return the value of its median using the multiprocess package'''
 
-    if log_lambdaV < -4:
+    if log_lambdaV < lib.Nlim:
         median = 0
 
     else:
@@ -83,13 +85,13 @@ def Compute_median_multi_process(q, log_lambdaV, dlog_lambdaV, precision):
     q.put(median)
 
 def WriteSFR(D, SFR, filename='SFR.csv'):
-    '''Save the computation to a file'''
+    '''Save the filtered SFR into a file'''
 
-    print("\n-->Writing mode on, creating a file " + filename)
+    print("\n-->Creating a file " + filename)
 
     with open(filename, mode='w') as flux_file:
-        flux_writer = csv.writer(flux_file, delimiter=' ', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        [flux_writer.writerow([ D[i], SFR[i] ]) for i in range(len(SFR))]
+        Filtered_SFR = csv.writer(flux_file, delimiter=' ', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        [Filtered_SFR.writerow([ D[i], SFR[i] ]) for i in range(len(SFR))]
 
 
 ### CSFH ##########################################################
@@ -156,6 +158,7 @@ class TableGalaxies:
         print('\n',self.file,": table is clean,", n_del,"/",n_gal,"removed")
 
     def SetEstimatorMethod(self, estimator="median"):
+        '''Set the estimator method & kill the program if the user doesn't make a accepted choice'''
 
         if(estimator != "median" and estimator != "mean"):
             print("Bad choice of self.estimator_method, it should be equal to mean or median")
@@ -165,6 +168,7 @@ class TableGalaxies:
             self.estimator_method = estimator
 
     def SetParameters(self, R, eta, B=100, lc=1, dmax=1.5):
+        '''Set the parameters for an object from TableGalaxies'''
         self.R, self.eta, self.B, self.lc, self.dmax = R, eta, B, lc, dmax
 
     def Delta_theta(self, D):
@@ -202,7 +206,7 @@ class TableGalaxies:
 
 
     def lambdaV(self):
-        '''Compute the sum of the average SFR'''
+        '''Compute the parameter lambda for each galaxy'''
 
         self.delta_tau = [ self.Delta_tau(self.D[i], self.Delta_theta(self.D[i])) for i in range(len(self.D))]
         self.log_lambda  = [self.log_sfr[i]   + np.log10(self.delta_tau[i] * self.eta) for i in range(len(self.D))]
@@ -247,8 +251,6 @@ class TableGalaxies:
         elif self.estimator_method == "mean":
             self.estimator = self.log_lambda
 
-        else:
-            self.BadEstimatorMethod()
 
         self.flux = self.estimator*self.omega
 
@@ -260,13 +262,18 @@ class TableGalaxies:
         '''Do the same as N_burst but using multi processing'''
 
         start_time = lib.time.time()
-        q = [lib.mp.Queue() for i in range(len(self.log_lambda))]
-        p = [lib.mp.Process(target=Compute_median_multi_process, args=(q[i], self.log_lambda[i], self.dlog_lambda[i], self.precision)) for i in range(len(q))]
-        [p[i].start() for i in range(len(p))]
-        self.estimator = [np.float(q[i].get()) for i in range(len(p))]
-        [p[i].join() for i in range(len(p))]
 
-        np.asarray(self.estimator)
+        if self.estimator_method == "median":
+            q = [lib.mp.Queue() for i in range(len(self.log_lambda))]
+            p = [lib.mp.Process(target=Compute_median_multi_process, args=(q[i], self.log_lambda[i], self.dlog_lambda[i], self.precision)) for i in range(len(q))]
+            [p[i].start() for i in range(len(p))]
+            self.estimator = [np.float(q[i].get()) for i in range(len(p))]
+            [p[i].join() for i in range(len(p))]
+
+        elif self.estimator_method == "mean":
+            self.estimator = self.log_lambda
+
+
         self.flux = self.estimator * self.omega
 
         N_galaxies = len(self.flux)
@@ -276,7 +283,7 @@ class TableGalaxies:
         print("---Nburst_multi_process took %s seconds ---" % (lib.time.time() - start_time))
 
     def Nburst_grouping(self, Dmin, Dmax):
-        '''Throw a Monte-Carlo simulation with the galaxies between Dmin & Dmax_plot
+        '''Throw a Monte-Carlo simulation with the galaxies between Dmin & Dmax
         Return the value of the expected flux & the error on this flux'''
 
         # Select the event between Dmin & Dmax
@@ -285,8 +292,6 @@ class TableGalaxies:
         log_lambdaV  = [self.log_lambda[id_range[i]] for i in range(len(id_range))]
         dlog_lambdaV = [self.dlog_lambda[id_range[i]] for i in range(len(id_range))]
         delta_tau    = [self.delta_tau[id_range[i]] for i in range(len(id_range))]
-        #omega        = [self.omega[id_range[i]] for i in range(len(id_range))]
-
 
         log_lambdaV = np.array(log_lambdaV)
         dlog_lambdaV = np.array(dlog_lambdaV)
@@ -319,15 +324,13 @@ class TableGalaxies:
             else:
                 estimator = 0
                 variance_tot = 0
-        else:
-            self.BadEstimatorMethod()
 
 
         return estimator, variance_tot
 
-    def Smeared_Nburst_grouping(self, Dmin, Dmax):
-        '''The same as Nburst_grouping but return the montecarlo run & the variance
-        instead of the median and the error'''
+    def Hist_Nburst_grouping(self, Dmin, Dmax):
+        '''The same as Nburst_grouping but return the montecarlo run
+        instead of the median'''
 
         # Select the event between Dmin & Dmax
         id_range   = np.where( (self.D>Dmin) & (self.D<=Dmax) )[0]
@@ -356,7 +359,7 @@ class TableGalaxies:
 
     def Binning_galaxies(self, Dmin, Dmax, dsmear=0.25, step_hist=0.01, step=0.01):
         '''Compute the histogram of bin of step_hist width, then do a gaussian
-        smearing every step with sigma=dsmear'''
+        smearing every step with sigma=dsmear. Return: X, Sfr_value, Error_Sfr_value'''
 
         # Create array for points & binning
         x_points = np.arange(Dmin, Dmax, step)
@@ -367,8 +370,9 @@ class TableGalaxies:
         sfr_DividedByV = np.zeros(N_points)
         variance_tot_DividedByVSquared = np.zeros(N_points)
 
+        # Get the result for each bin
         if self.estimator_method =="median":
-            result  = [self.Smeared_Nburst_grouping(binning_hist[i], binning_hist[i+1]) for i in tqdm(range(len(binning_hist)-1))]
+            result  = [self.Hist_Nburst_grouping(binning_hist[i], binning_hist[i+1]) for i in tqdm(range(len(binning_hist)-1))]
 
         elif self.estimator_method =="mean":
 
@@ -427,7 +431,7 @@ class TableGalaxies:
 
 
     def Nburst_density(self, Dmin=0, Dmax=np.infty):
-        '''Compute the flux between Dmin & Dmax'''
+        '''Compute the SFR denstiy between Dmin & Dmax'''
 
         #default result
         dres, flux_res, e_flux_res = 0, 0, 0
@@ -647,6 +651,8 @@ class TableGalaxies:
 
     ### Plot the flux and flux density ###############################################
     def plotLambda(self, dmin = 0, dmax=100, noDisplay=False):
+        '''Plot the lambdas values with their error bars'''
+
         plt.errorbar(self.D, self.log_lambda, yerr=self.dlog_lambda, alpha=0.2, marker='o', linestyle='')
         #plt.xscale("log")
         plt.xlim(dmin,dmax)
@@ -914,7 +920,7 @@ class TableGalaxies:
         self.dlog_lambda = np.array(df['dlog_lambda'])
         self.omega       = np.array(df['omega'])
         self.flux        = np.array(df['flux'])
-        self.estimator      = self.flux / self.omega
+        self.estimator   = self.flux / self.omega
         self.D           = np.array(df['D'])
         self.delta_tau   = np.array(df['delta_tau'])
         print(" Succeed !")
@@ -937,7 +943,7 @@ class TableGalaxies:
 ### Main ##########################################################
 if __name__ == "__main__":
 
-    # Parser to select writing/reading mode
+    # Parser to select writing/reading, R, eta, noDisplay, median/mean
     parser = argparse.ArgumentParser()
     parser.add_argument("R", type=float, help="Value of R_cut")
     parser.add_argument("eta",type=float, help="Value of eta")
@@ -988,11 +994,11 @@ if __name__ == "__main__":
 
     #Plot the SFR
     table_LocalVolume.plotSFR(dmin, dmax, step=step_density, noDisplay=args.noDisplay)
-    #table_LocalVolume.mapSFR(dmin, dmax, noDisplay=args.noDisplay)
+    table_LocalVolume.mapSFR(dmin, dmax, noDisplay=args.noDisplay)
 
     #Plot the flux vs distance & map the flux
     table_LocalVolume.plotFilteredSFR(dmin, dmax, step=step_density, filename_pic=filename_graph, filename_sfr=filename_sfr, noDisplay=args.noDisplay)
-    #table_LocalVolume.mapFilteredSFR(dmin, dmax, filename=filename_map, noDisplay=args.noDisplay)
+    table_LocalVolume.mapFilteredSFR(dmin, dmax, filename=filename_map, noDisplay=args.noDisplay)
 
     #table_LocalVolume.WriteSimple()
 
