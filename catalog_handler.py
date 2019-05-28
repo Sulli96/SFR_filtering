@@ -955,7 +955,7 @@ if __name__ == "__main__":
 
     #Load the Local Volume table
     filename_LocalVolume = "LocalVolume/Karachentsev18_1029Gal_LV_Augmented.dat"
-    table_LocalVolume    = TableGalaxies(filename_LocalVolume, N_points=1000)
+    table_LocalVolume    = TableGalaxies(filename_LocalVolume, N_points=100000)
 
     # Range & step for computing SFR & Flux density
     step_density = 1. #Mpc
@@ -980,7 +980,7 @@ if __name__ == "__main__":
 
         #Compute lambda, Nburst and write it to a csv file
         table_LocalVolume.lambdaV()
-        if args.method == "median":
+        if table_LocalVolume.estimator_method == "median":
             table_LocalVolume.Nburst_multi_process()
             table_LocalVolume.WriteCSV(filename_flux)
         else:
